@@ -1,47 +1,42 @@
 #!/bin/bash
 
+## Intel Prefetch Tuner.
+## Author: Manel Lurbe Sempere
+## e-mail: malursem@gap.upv.es
+## Year: 2022
+
 echo "Hello, "$USER".  This script will launch Intel Prefetch Tuner scheduler."
-NUM_CORES=8
-CPU_FREQ=4200000
+read -p "Introduce the number of cores [ENTER]: " num_cores
+read -p "Introduce the cpu frequency [ENTER]: " cpu_freq
+{ sudo ./start_experiments.sh -c $num_cores -f $cpu_freq; }
+
 read -p "Introduce the quantum length in ms [ENTER]: " quantum_time
 
-echo "a-Dynamic."
-echo "b-Static."
-read -p "Select the mode of execution [ENTER]: " mode_ex
-case "$mode_ex" in
+echo "a-[0]."
+echo "b-[1]."
+echo "c-[2]."
+echo "d-[3]."
+echo "e-[4]."
+echo "f-[5]."
+echo "g-All."
+read -p "Select the MSR [ENTER]: " array_ex
+case "$array_ex" in
    #case 1
-   "a")  echo "Dynamic scheduling selected.";;
+   "a")  dscr_array="0";;
    #case 2
-   "b")  echo "a-[0,1,2,3,4,5]."
-         echo "b-[0]."
-         echo "c-[1]."
-         echo "d-[2]."
-         echo "e-[3]."
-         echo "f-[4]."
-         echo "g-[5]."
-         read -p "Select the mode of execution [ENTER]: " array_ex
-         case "$array_ex" in
-            #case 1
-            "a")  dscr_array="0 1 2 3 4 5";;
-            #case 2
-            "b")  dscr_array="0";;
-            #case 3
-            "c")  dscr_array="1";;
-            #case 4
-            "d")  dscr_array="2";;
-            #case 5
-            "e")  dscr_array="3";;
-            #case 6
-            "f")  dscr_array="4";;
-            #case 7
-            "g")  dscr_array="5";;
-            *) echo "Invalid entry for DSCR array."
-               exit 1 # Exit script
-         esac ;;
-
+   "b")  dscr_array="1";;
    #case 3
-   *) echo "Invalid entry for mode_ex."
-      exit 1# Exit script
+   "c")  dscr_array="2";;
+   #case 4
+   "d")  dscr_array="3";;
+   #case 5
+   "e")  dscr_array="4";;
+   #case 6
+   "f")  dscr_array="5";;
+   #case 7
+   "g")  dscr_array="0 1 2 3 4 5";;
+   *) echo "Invalid entry for MSR."
+      exit 1 # Exit script
 esac
 
 echo "a-Single-Core."
@@ -76,23 +71,13 @@ case "$type_ex" in
             *) echo "Invalid entry for workloadArray."
                exit 1 # Exit script
          esac
-         # { sudo ./start_experiments.sh -c $NUM_CORES -f $CPU_FREQ; }
-         case "$mode_ex" in
-            "a") for workload in $workloadArray #Dynamic Single-core
-                  do
-                     sudo ./Intel_Prefetch_Tuner -m 0 -d ${quantum_time} -o "Intel_Prefetch_Tuner_res/singlecore/${dir_out_ex}/trabajo[${workload}]conf[auto]rep[0]core" -A 0 -B $workload -C 0 2>> Intel_Prefetch_Tuner_res/singlecore/${dir_out_ex}/outTrabajo[${workload}]conf[auto]rep[0].txt
-                  done ;;
-            "b") for workload in $workloadArray #Static Single-core
-                  do
-                     for dscr in $dscr_array
-                     do
-                        sudo ./Intel_Prefetch_Tuner -m 1 -d ${quantum_time} -o "Intel_Prefetch_Tuner_res/singlecore/${dir_out_ex}/trabajo[${workload}]conf[${dscr}]rep[0]core" -A 0 -B $workload -C $dscr 2>> Intel_Prefetch_Tuner_res/singlecore/${dir_out_ex}/outTrabajo[${workload}]conf[${dscr}]rep[0].txt
-                     done
-                  done ;;
-            *) echo "Invalid entry to be executed."
-               # { sudo ./end_experiments.sh -c $NUM_CORES; }
-               exit 1 # Exit script
-         esac ;;
+         for workload in $workloadArray #Static Single-core
+         do
+            for dscr in $dscr_array
+            do
+               sudo ./Intel_Prefetch_Tuner -d ${quantum_time} -o "Intel_Prefetch_Tuner_res/singlecore/${dir_out_ex}/trabajo[${workload}]conf[${dscr}]rep[0]core" -A 0 -B $workload -C $dscr 2>> Intel_Prefetch_Tuner_res/singlecore/${dir_out_ex}/outTrabajo[${workload}]conf[${dscr}]rep[0].txt
+            done
+         done ;;
    #case 2 #Multi-core
    "b")  if mkdir Intel_Prefetch_Tuner_res/multicore/${dir_out_ex} ; then
             echo \#Directory created working_dir/Intel_Prefetch_Tuner_res/multicore/${dir_out_ex}\#
@@ -123,27 +108,17 @@ case "$type_ex" in
             *) echo "Invalid entry for workloadArray."
                exit 1 # Exit script
          esac
-         # { sudo ./start_experiments.sh -c $NUM_CORES -f $CPU_FREQ; }
-         case "$mode_ex" in
-            "a") for workload in $workloadArray #Dynamic Multi-core
-                  do
-                     sudo ./Intel_Prefetch_Tuner -m 0 -d ${quantum_time} -o "Intel_Prefetch_Tuner_res/multicore/${dir_out_ex}/trabajo[${workload}]conf[auto]rep[0]core" -A $workload 2>> Intel_Prefetch_Tuner_res/multicore/${dir_out_ex}/outTrabajo[${workload}]conf[auto]rep[0].txt
-                  done ;;
-            "b") for workload in $workloadArray #Static Multi-core
-                  do
-                     for dscr in $dscr_array
-                     do
-                        sudo ./Intel_Prefetch_Tuner -m 1 -d ${quantum_time} -o "Intel_Prefetch_Tuner_res/multicore/${dir_out_ex}/trabajo[${workload}]conf[${dscr}]rep[0]core" -A $workload -C $dscr 2>> Intel_Prefetch_Tuner_res/multicore/${dir_out_ex}/outTrabajo[${workload}]conf[${dscr}]rep[0].txt
-                     done
-                  done ;;
-            *) echo "Invalid entry to be executed."
-               # { sudo ./end_experiments.sh -c $NUM_CORES; }
-               exit 1 # Exit script
-         esac ;;
+         for workload in $workloadArray #Static Multi-core
+         do
+            for dscr in $dscr_array
+            do
+               sudo ./Intel_Prefetch_Tuner -d ${quantum_time} -o "Intel_Prefetch_Tuner_res/multicore/${dir_out_ex}/trabajo[${workload}]conf[${dscr}]rep[0]core" -A $workload -C $dscr 2>> Intel_Prefetch_Tuner_res/multicore/${dir_out_ex}/outTrabajo[${workload}]conf[${dscr}]rep[0].txt
+            done
+         done ;;
    #case 3
    *) echo "Invalid entry for type_ex."
       exit 1 # Exit script
 esac
 
 ##END SCRIPT##
-# { sudo ./end_experiments.sh -c $NUM_CORES; }
+{ sudo ./end_experiments.sh -c $num_cores; }

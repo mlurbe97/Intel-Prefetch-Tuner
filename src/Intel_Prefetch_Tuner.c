@@ -1,5 +1,5 @@
 /*
-## DeepP Intel.
+## Intel Prefetch Tuner.
 ## Author: Manel Lurbe Sempere
 ## e-mail: malursem@gap.upv.es
 ## Year: 2022
@@ -66,15 +66,11 @@ typedef struct {//Defines the variables of an application or process. Represents
 	*/
 	uint64_t total_instructions;//Total instructions executed by the application.
 	uint64_t total_cycles;//Total cycles executed by the application.
-	uint64_t interval_instructions;
-	uint64_t interval_cycles;
 	uint64_t *my_Counters;//Counter array where the different counters are stored in each quantum.
 	uint64_t instruction;//Instructions executed in the last quantum.
 	uint64_t cycles;//Cycles executed in the last quantum.
 	int actual_MSR;//Current msr configuration.
-	int predicted_MSR;//Configuration predicted by the prediction program.
 	float actual_IPC;//IPC of the measurement interval.
-	float predicted_IPC;//IPC predicted by the predictor.
 	float actual_BW;
 	float sum_BW;
 
@@ -102,18 +98,10 @@ int workload;//Workload number
 
 float sum_BW;
 
-int planificar = 0;//Indicates whether to plan when it is 1, when all quantums are executed virtual_Quantums.
-int virtual_Count = 0;//It indicates the quantum in which it is located in order to measure the relevant counters.
-const int virtual_Quantums = 4;//Number of quantums that make up a virtual quantum.
-const int num_Counters = 16;//Indicates the number of counters that are programmed, 4 per quantum. Instructions and cycles go apart.
-const char python_Program[] = "python DeepP_net.pyc";//Bash command to call the prediction program.
-const float CPU_FREQ = 3690.0;//Processor frequency at which we launch the experiments.
-const int LLC_LOAD_MISSES = 12;//Counter position in the array of counters.
-const int PM_MEM_PREF = 5;//Counter position in the array of counters.
+const int num_Counters = 3;//Indicates the number of counters that are programmed, 4 per quantum. Instructions and cycles go apart.
+const float CPU_FREQ = 2500.0;//Processor frequency at which we launch the experiments.
 
 //Reading and writing files.
-FILE* read_Predictions;
-FILE* write_Data;
 FILE* core_Info;
 
 // Overhead time
@@ -571,25 +559,16 @@ static void get_counts(node *aux){
 		switch(i) {
 			case 0:// Cycles
 				aux->cycles = val;
-				if(virtual_Count == 0){
-					aux->interval_cycles = 0;
-				}
-				aux->interval_cycles += val;
 				aux->total_cycles += val;
 				//fprintf(stdout, "CASE 0 Cycles = %ld, Interval = %ld\n", aux->cycles,aux->interval_cycles);
 				break;
 			case 1:// Instructions
 				aux->instruction = val;
-				if(virtual_Count == 0){
-					aux->interval_instructions = 0;
-				}
-				aux->interval_instructions += val;
 				aux->total_instructions += val;
 				//fprintf(stdout, "CASE 1 Instrucctions = %ld, Interval = %ld\n", aux->instruction,aux->interval_instructions);
 				break;
 			default:// Others
 				aux->my_Counters[cont] = val;
-				//fprintf(stdout, "CASE DEFAULT %s = %ld\n",aux->fds[i].name, val);
 				cont++;
 				break;
 		}
@@ -690,95 +669,14 @@ int launch_process(node *node) {
 }
 
 /************************************************************
-**                  INICIO DE LA PREDICCION                **
+**                  Print results			               **
 *************************************************************/
 
-int predict_MSR(node *node) {
-	int j;
-  	node->predicted_MSR = -1;
-	/*
-		SAVE THE OUTPUT BY SCREEN OF EACH CORE SEPARATELY
-	*/
-	core_Info = fopen(node->core_out, "a");
-	node->sum_BW = sum_BW - node->actual_BW;// Get the BW consumed by others
-	if(!(node->finished)){// Since you want to store only the target instructions, you must put this if so that it stops saving the results of the ending core.
-		fprintf(core_Info,"%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%f\t", node->instruction,node->cycles,node->interval_instructions,node->interval_cycles,node->total_instructions,node->total_cycles,node->sum_BW);
-		//fprintf(core_Info,"%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%f\t", node->instruction,node->cycles,node->total_instructions,node->total_cycles,node->sum_BW);
-	}
-	  /*
-		WRITE THE CURRENT DATA
-	*/
-	write_Data = fopen("predictionData.csv", "w");
-	if(write_Data == NULL){
-	  fprintf(stderr,"ERROR: Couldn't open file predictionData.csv\n");
-		return -2;
-	}
-	fprintf(write_Data, "%d,%f,%f,%f,%f,%f,%f,%f,%f,%f,", node->actual_MSR,node->actual_IPC,node->last_IPC_1,node->last_IPC_2,node->last_IPC_3,node->sum_BW,node->actual_BW,node->last_BW_1,node->last_BW_2,node->last_BW_3);
-	// Write the counters to the file.
-	for(j=0; j < num_Counters; j++) {
-		if(j==num_Counters-1){
-			fprintf(write_Data, "%"PRIu64"", node->my_Counters[j]);
-		}else{
-			fprintf(write_Data,"%"PRIu64",", node->my_Counters[j]);
-		}
-	}
-	fclose(write_Data);
-	/*
-		CALL FOR THE PREDICTION CODE
-	*/
+void print_results(node *node) {
 
-	//overhead = clock();
-	if(options.mode == 0){
-		system(python_Program);
-	}
-	//overhead = clock() - overhead;
-	//double total_overhead = ((double)overhead)/CLOCKS_PER_SEC;// in seconds
-	//fprintf(stderr,"INFO: Overhead\t%f\n",total_overhead);
-	/*
-      READ THE PREDICTION
-    */
-    FILE* read_Predictions;
-    read_Predictions = fopen("predictions.txt", "r");
-    if(read_Predictions == NULL){
-      fprintf(stderr,"ERROR: Couldn't open file predictions.txt\n");
-      return -2;
-    }
-    fscanf(read_Predictions, "%d\n%f", &(node->predicted_MSR),&(node->predicted_IPC));
-    fclose(read_Predictions);
-	/*
-		WE SHOW PREDICTION AND THE CURRENT STATUS.
-	*/
-	//actual_msr\tactual_ipc\tactual_bw\tpredict_msr\tpredict_ipc\tcounters\n
-	if(!(node->finished)){// Since you want to store only the target instructions, you must put this if so that it stops saving the results of the ending core.
-		fprintf(core_Info,"%d\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%d\t%f", node->actual_MSR,node->actual_IPC,node->last_IPC_1,node->last_IPC_2,node->last_IPC_3,node->actual_BW,node->last_BW_1,node->last_BW_2,node->last_BW_3,node->predicted_MSR,node->predicted_IPC);
-		for(j=0; j < num_Counters; j++) {
-			if(j==num_Counters-1){
-				fprintf(core_Info, "\t%"PRIu64"\n", node->my_Counters[j]);
-			}else{
-				fprintf(core_Info,"\t%"PRIu64"", node->my_Counters[j]);
-			}
-		}
-	}
+	core_Info = fopen(node->core_out, "w");
+	fprintf(core_Info,"%ld\t%ld\t%ld\t%ld\t%ld\t%ld\t%ld\n",node->instruction,node->total_instructions,node->cycles,node->total_cycles,node->my_Counters[0],node->my_Counters[1],node->my_Counters[2]);
 	fclose(core_Info);
-	/*
-		INITIALIZE ARRAY ON MY_COUNTERS
-	*/
-	initialize_my_Counters(node);
-	/*
-		WE CONFIGURE THE PREFETCHER.
-	*/
-	//Verify that a config has been chosen and if it is not the one currently configured, configure it.
-	if(node->predicted_MSR != -1 && node->predicted_MSR != node->actual_MSR){
-		if(options.mode == 0){
-			node->actual_MSR = node->predicted_MSR;//In dynamic data collection, the MSR must be changed
-		} else {
-			node->actual_MSR = node->actual_MSR;//In static it is not necessary to change the MSR. actual_MSR = actual_MSR always.
-		}
-		if(planificar == 1 && node->pid != -1){
-			wrmsr_on_cpu(node->actual_MSR, node->pid);
-		}
-	}
-	return 0;
 }
 
 /*************************************************************
@@ -786,7 +684,7 @@ int predict_MSR(node *node) {
  *************************************************************/
 
 int measure() {
-	int i, ret, errorPred = 1;
+	int i, ret;
 
 	// Free processes (SIGCONT-Continue a paused process)
 	for(i=0; i<N; i++) {
@@ -821,6 +719,7 @@ int measure() {
 			queue[i].pid = -1;
 		}
 	}
+	//sum_BW = 0.0;
 	// Pick up counters for each process
 	for(i=0; i<N; i++) {
 		get_counts(&(queue[i]));
@@ -840,63 +739,23 @@ int measure() {
 		}else{
 			queue[i].actual_IPC = 0.0;
 		}
-
-	}
-
-	// Calculate the virtual quantum of the next iteration
-	if(virtual_Count < virtual_Quantums-1){//0 1 2 3-> 4
-		virtual_Count++;
-	}else{
-		planificar = 1;
-		virtual_Count = 0;
+		/*
+			CALCULATE CURRENT BANDWIDTH OF INTERVAL
+		*/
+		// queue[i].last_BW_3 = queue[i].last_BW_2;
+		// queue[i].last_BW_2 = queue[i].last_BW_1;
+		// queue[i].last_BW_1 = queue[i].actual_BW;
+		
+		// if(queue[i].cycles != 0){
+		// 	queue[i].actual_BW = (float) ((float) (queue[i].my_Counters[PM_MEM_PREF]+queue[i].my_Counters[LLC_LOAD_MISSES])*CPU_FREQ) / (float) queue[i].cycles;
+		// }else{
+		// 	queue[i].actual_BW = 0.0;
+		// }
+		// sum_BW += queue[i].actual_BW;
 	}
 	
-	if(planificar==1){
-		/*
-			UPDATE THE BW OF PREVIOUS INTERVALS
-		*/	
-		sum_BW = 0.0;//BW can't be updated every quantum because the counters are not updated every quantum, just every interval
-		for(i=0; i<N; i++){
-			queue[i].last_BW_3 = queue[i].last_BW_2;
-			queue[i].last_BW_2 = queue[i].last_BW_1;
-			queue[i].last_BW_1 = queue[i].actual_BW;
-			/*
-				CALCULATE CURRENT BANDWIDTH OF INTERVAL
-			*/
-			if(queue[i].cycles != 0){
-				queue[i].actual_BW = (float) ((float) (queue[i].my_Counters[PM_MEM_PREF]+queue[i].my_Counters[LLC_LOAD_MISSES])*CPU_FREQ) / (float) queue[i].cycles;
-			}else{
-				queue[i].actual_BW = 0.0;
-			}
-			sum_BW += queue[i].actual_BW;
-		}
-		for(i=0; i<N; i++){
-			errorPred = predict_MSR(&(queue[i]));
-			if(errorPred<0){//If errors in prediction				
-				fprintf(stderr, "ERROR: Couldn't predict the IPC for process PID=%d\n",queue[i].pid);
-			}
-		}
-		/*
-			MARK AS FINISHED IF THERE IS AN ERROR TO NOT LOSE THE VIRTUAL QUANTUMS
-		*/
-		planificar = 0;
-	}
-	// Change counters for the next quantum
-	switch(virtual_Count){
-		case 0:
-			options.events=strdup("cycles,instructions,PM_L1_ICACHE_MISS,PERF_COUNT_HW_CACHE_L1D:READ:MISS,PERF_COUNT_HW_CACHE_L1D:WRITE:MISS,PERF_COUNT_HW_CACHE_LL:WRITE:MISS");
-			break;
-		case 1:
-			options.events=strdup("cycles,instructions,PM_DATA_FROM_L3,PM_MEM_PREF,PERF_COUNT_HW_CACHE_L1I:PREFETCH:ACCESS,PERF_COUNT_HW_CACHE_L1D:PREFETCH:ACCESS");
-			break;
-		case 2:
-			options.events=strdup("cycles,instructions,PM_MEM_READ,PM_L1_ICACHE_RELOADED_PREF,PM_DATA_FROM_MEMORY,PM_BR_MPRED_CMPL");
-			break;
-		case 3:
-			options.events=strdup("cycles,instructions,LLC-LOAD-MISSES,PM_DISP_HELD_IQ_FULL,LLC-LOADS,PERF_COUNT_HW_BRANCH_INSTRUCTIONS");
-			break;
-		default:
-			break;
+	for(i=0; i<N; i++){
+		print_results(&(queue[i]));
 	}
 	return ret;
 }
@@ -906,8 +765,7 @@ int measure() {
  *************************************************************/
 
 static void usage(void) {
-  printf("\nUso:  DeepP Intel\n\n");
-  printf("-m mode Static 1 or Dinamic 0\n");
+  printf("\nUso:  Intel_Prefetch_Tuner\n");
   printf("-d quanta duration(ms)\n");
   printf("[-o output_directory for the output of the prediction function (it will be divided into files for each core)]\n");
   printf("[-h [help]]\n");
@@ -924,23 +782,19 @@ static void usage(void) {
 
 int main(int argc, char **argv) {
 
-	printf("\nDeepP Intel.\nAuthor: Manel Lurbe Sempere\ne-mail: malursem@gap.upv.es\nYear: 2022\n");
+	printf("\nIntel Prefetch Tuner. Author: Manel Lurbe Sempere e-mail: malursem@gap.upv.es Year: 2022\n");
 
-	int c, i,j, ret, quantums = 0;
+	int c, i, ret, quantums = 0;
 	int individualBench = -1;
 	int individualMSR = 0;// Default configuration. ALL prefetchers enabled
 	// Set initial events to measure
-	options.events = strdup("cycles,instructions,PM_L1_ICACHE_MISS,PERF_COUNT_HW_CACHE_L1D:READ:MISS,PERF_COUNT_HW_CACHE_L1D:WRITE:MISS,PERF_COUNT_HW_CACHE_LL:WRITE:MISS");
+	options.events = strdup("cycles,instructions,OFFCORE_REQUESTS_OUTSTANDING.ALL_DATA_RD,OFFCORE_REQUESTS_OUTSTANDING.CYCLES_WITH_DATA_RD,OFFCORE_REQUESTS_OUTSTANDING.CYCLES_WITH_DEMAND_RFO");
 	options.delay = 200;
 	end_experiment = 0;
-	options.mode = 1;// Default scheduler mode STATIC 1
 	N = -1;
 
-	while((c=getopt(argc, argv,"m:d:o:hA:B:C:PgS:N:")) != -1) {
+	while((c=getopt(argc, argv,"d:o:hA:B:C:PgS:N:")) != -1) {
 		switch(c) {
-			case 'm':
-				options.mode = atoi(optarg);
-				break;
 			case 'd':
 				options.delay = atoi(optarg);
 				break;
@@ -1009,8 +863,6 @@ int main(int argc, char **argv) {
 		*/
 		queue[i].total_instructions = 0;
 		queue[i].total_cycles = 0;
-		queue[i].interval_instructions = 0;
-		queue[i].interval_cycles = 0;
 		/*
 			From the current quantum of the application
 		*/
@@ -1020,9 +872,7 @@ int main(int argc, char **argv) {
 			Values to store
 		*/
 		queue[i].actual_MSR = individualMSR;
-		queue[i].predicted_MSR = -1;
 		queue[i].actual_IPC = 0;
-		queue[i].predicted_IPC = 0;
 		queue[i].actual_BW = 0;
 		queue[i].sum_BW = 0.0;
 
@@ -1086,14 +936,7 @@ int main(int argc, char **argv) {
 			Each core prepares its results file, to later in the post-processing know what core the data is.
 		*/
 		core_Info = fopen(queue[i].core_out, "w");
-		fprintf(core_Info,"instructions\tcycles\tinterval_instructions\tinterval_cycles\ttotal_instructions\ttotal_cycles\tsum_BW\tactual_msr\tactual_ipc\tlast_ipc1\tlast_ipc2\tlast_ipc3\tactual_bw\tlast_bw1\tlast_bw2\tlast_bw3\tpredict_msr\tpredict_ipc");
-		for(j=0; j < num_Counters; j++) {
-			if(j==num_Counters-1) {
-				fprintf(core_Info, "\tCounter%d\n",j);
-			} else{
-				fprintf(core_Info,"\tCounter%d",j);
-			}
-		}
+		fprintf(core_Info,"instructions\ttotal_instructions\tcycles\ttotal_cycles\tALL_DATA_RD\tCYCLES_WITH_DATA_RD\tCYCLES_WITH_DEMAND_RFO\n");
 		fclose(core_Info);
 		CPU_ZERO(&(queue[i].mask));	
 		CPU_SET(queue[i].core, &(queue[i].mask));

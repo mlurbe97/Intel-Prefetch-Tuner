@@ -44,6 +44,23 @@ Prefetch tuner dinamically when executes an application on Intel procesors.
     current policy: frequency should be within 800 MHz and 4.10 GHz.
     ```
 
+- Disable intel_pstate on the kernel boot to control the frequency of the CPU.
+    ```
+    sudo nano /etc/default/grub
+    ```
+    Add the following line to the file:
+    ```
+    GRUB_CMDLINE_LINUX_DEFAULT="intel_pstate=disable"
+    ```
+    Then run the command:
+    ```
+    sudo update-grub
+    ```
+    Finally reboot the machine:
+    ```
+    sudo reboot
+    ```
+
 - Prepare the workspace.
     ```
     mkdir $HOME/woriking_dir/
