@@ -62,9 +62,9 @@ case "$type_ex" in
             #case 1
             "a") workloadArray="0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26";;## 2006 & microbenchmark applications.
             #case 2 
-            "b") workloadArray="27" ;;# Geekbench5.
+            "b") workloadArray="27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47" ;;# Geekbench5.
             #case 3 
-            "c") workloadArray="0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27" ;;## All applications.
+            "c") workloadArray="0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47" ;;## All applications.
             #case 4 
             "d") workloadArray="20" ;;## microbenchmark.
             #case 5 

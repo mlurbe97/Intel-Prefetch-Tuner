@@ -674,7 +674,7 @@ int launch_process(node *node) {
 
 void print_results(node *node) {
 
-	core_Info = fopen(node->core_out, "w");
+	core_Info = fopen(node->core_out, "a");
 	fprintf(core_Info,"%ld\t%ld\t%ld\t%ld\t%ld\t%ld\t%ld\n",node->instruction,node->total_instructions,node->cycles,node->total_cycles,node->my_Counters[0],node->my_Counters[1],node->my_Counters[2]);
 	fclose(core_Info);
 }
