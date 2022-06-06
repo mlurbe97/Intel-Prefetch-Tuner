@@ -1,6 +1,8 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 import sys
+import matplotlib.pyplot as plt
+import numpy as np
 
 program = sys.argv[0]
 dir = sys.argv[1]
@@ -13,12 +15,14 @@ benchmarksNames = ["perlbench checkspam","bzip2","gcc","mcf","gobmk","hmmer","sj
 repetitions=[0]
 configs = [0,1,2,3,4,5]
 cores = [0]
-	# 0				1                   2		3				4		5		6
-	# instructions	total_instructions	cycles	total_cycles	cont0	cont1	cont2
+
+# 0				1                   2		3				4		5		6
+# instructions	total_instructions	cycles	total_cycles	cont0	cont1	cont2
 for core in cores:
     for bench in benchmarks:
         results_ipc = open("data_bench["+str(bench)+"]core["+str(core)+"].csv", 'w')
         for rep in repetitions:
+            values = []
             for conf in configs:
                 instructions = 0.0
                 cycles = 0.0
@@ -38,8 +42,35 @@ for core in cores:
                                 cycles = cycles + float(columns[2])
                             except:
                                 continue
-                    ipc = float(instructions/cycles)
-                    String = str(bench)+"\t"+str(conf)+"\t"+str(ipc)+"\n"
-                    results_ipc.write(String)
+                    try:
+                        ipc = float(instructions/cycles)
+                        String = str(bench)+"\t"+str(conf)+"\t"+str(ipc)+"\n"
+                        values.append(ipc)
+                        results_ipc.write(String)
+                    except:
+                        continue
                     fitx.close()
+            y_pos = np.arange(len(configs))
+            plt.bar(y_pos, values, tick_label = configs, width = 0.8, color = ['red','blue','#b5ffb9', '#f9bc86','#a3acff','#2d7f5e'])
+
+            # Layouts
+            plt.ylabel('IPC',fontweight='bold')
+            plt.xlabel('MSR',fontweight='bold')
+
+            # Title
+            title = "IPC : "+benchmarksNames[benchmarks.index(bench)]
+            plt.title(title,fontweight='bold')
+
+            # Auto layout
+            plt.tight_layout()
+
+            # Save graphic
+            figName = title.replace(" ", "_")+'['+str(core)+'].png'
+            figName = figName.replace("_:","")
+            plt.savefig("./" + figName)
+            plt.clf()
+            plt.close()
+            fitx.close()
+                    
         results_ipc.close()
+
