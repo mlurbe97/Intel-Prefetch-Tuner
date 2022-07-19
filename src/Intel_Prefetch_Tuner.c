@@ -98,7 +98,7 @@ int workload;//Workload number
 
 float sum_BW;
 
-const int num_Counters = 3;//Indicates the number of counters that are programmed, 4 per quantum. Instructions and cycles go apart.
+const int num_Counters = 2;//Indicates the number of counters that are programmed per quantum. Instructions and cycles go apart.
 const float CPU_FREQ = 2500.0;//Processor frequency at which we launch the experiments.
 
 //Reading and writing files.
@@ -788,7 +788,7 @@ int main(int argc, char **argv) {
 	int individualBench = -1;
 	int individualMSR = 0;// Default configuration. ALL prefetchers enabled
 	// Set initial events to measure
-	options.events = strdup("cycles,instructions,OFFCORE_REQUESTS_OUTSTANDING.ALL_DATA_RD,OFFCORE_REQUESTS_OUTSTANDING.CYCLES_WITH_DATA_RD,OFFCORE_REQUESTS_OUTSTANDING.CYCLES_WITH_DEMAND_RFO");
+	options.events = strdup("cycles,instructions,OFFCORE_REQUESTS.ALL_DATA_RD,OFFCORE_REQUESTS.L3_MISS_DEMAND_DATA_RD");
 	options.delay = 200;
 	end_experiment = 0;
 	N = -1;
@@ -936,7 +936,7 @@ int main(int argc, char **argv) {
 			Each core prepares its results file, to later in the post-processing know what core the data is.
 		*/
 		core_Info = fopen(queue[i].core_out, "w");
-		fprintf(core_Info,"instructions\ttotal_instructions\tcycles\ttotal_cycles\tALL_DATA_RD\tCYCLES_WITH_DATA_RD\tCYCLES_WITH_DEMAND_RFO\n");
+		fprintf(core_Info,"instructions\ttotal_instructions\tcycles\ttotal_cycles\tOFFCORE_REQUESTS.ALL_DATA_RD\tOFFCORE_REQUESTS.L3_MISS_DEMAND_DATA_RD\n");
 		fclose(core_Info);
 		CPU_ZERO(&(queue[i].mask));	
 		CPU_SET(queue[i].core, &(queue[i].mask));

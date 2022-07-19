@@ -13,7 +13,7 @@ Prefetch tuner dinamically when executes an application on Intel procesors.
 - Install pre-requisites.
     ```
     sudo apt update && sudo apt upgrade
-    sudo apt install gcc g++ build-essential cpufrequtils
+    sudo apt install gcc g++ build-essential cpufrequtils cpuid
     ```
 - To run a 32-bit executable file on a 64-bit multi-architecture:
     ```
@@ -22,7 +22,10 @@ Prefetch tuner dinamically when executes an application on Intel procesors.
     sudo apt-get install libc6:i386 libncurses5:i386 libstdc++6:i386
     sudo apt-get install multiarch-support
     ```
-
+- Check the number of HPC available on the processor cores in your system, type this command and you will find.
+    ```
+    cpuid -1 | grep counters
+    ```
 - Check available processor cores in your system, type this command and you will find.
     ```
     nproc
